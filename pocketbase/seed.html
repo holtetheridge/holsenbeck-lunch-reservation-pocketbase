@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  Holsenbeck Lunch Reservation — PocketBase Seed Data Tool
+  ============================================================
+  USAGE:
+    1. Make sure PocketBase is running at http://127.0.0.1:8090
+    2. Make sure collections are imported (pb_schema.json)
+    3. Open via the dev server: http://localhost:8080/pocketbase/seed.html
+    4. Enter your superuser email + password and click "Run Seed"
+
+  WHAT IT SEEDS:
+    • settings        — table_count, advance_booking_days,
+                        available_weekdays, school_name
+    • admin_emails    — 6 staff addresses
+    • timeslots       — 7 slots across Scenario A & B
+    • school_breaks   — 2026-2028 calendar (22 entries)
+    • email_templates — approved, rejected, cancelled
+  ============================================================
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>PocketBase Seed Tool — Holsenbeck</title>
+  <script src="https://cdn.jsdelivr.net/npm/pocketbase@0.21.5/dist/pocketbase.umd.js"></script>
+  <style>
+    *{box-sizing:border-box;}
+    body{font-family:system-ui,sans-serif;background:#f3f4f6;margin:0;padding:24px;color:#111827;}
+    .card{background:white;border-radius:12px;padding:28px;max-width:680px;margin:0 auto;box-shadow:0 4px 12px rgba(0,0,0,.08);}
+    h1{font-size:20px;font-weight:700;margin:0 0 4px;}
+    .sub{color:#6b7280;font-size:14px;margin:0 0 24px;}
+    label{display:block;font-size:13px;font-weight:600;margin-bottom:4px;color:#374151;}
+    input{width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;margin-bottom:14px;}
+    input:focus{outline:2px solid #6366f1;border-color:#6366f1;}
+    .btn{display:inline-block;padding:10px 22px;background:#6366f1;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;}
+    .btn:disabled{opacity:.5;cursor:not-allowed;}
+    .btn-clear{background:#6b7280;margin-left:10px;}
+    hr{border:none;border-top:1px solid #e5e7eb;margin:20px 0;}
+    #log{margin-top:20px;background:#111827;color:#d1fae5;border-radius:8px;padding:16px;font-family:monospace;font-size:13px;min-height:80px;max-height:500px;overflow-y:auto;white-space:pre-wrap;display:none;}
+    .ok{color:#6ee7b7;}.err{color:#fca5a5;}.hd{color:#93c5fd;font-weight:bold;}.warn{color:#fde68a;}
+    .wbox{background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px 16px;font-size:13px;color:#92400e;margin-bottom:20px;}
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>🌱 PocketBase Seed Tool</h1>
+  <p class="sub">Holsenbeck Elementary School — Lunch Reservation System</p>
+  <div class="wbox">⚠️ <strong>This will overwrite existing data</strong> in settings, timeslots, school_breaks, email_templates, and admin_emails. Existing reservations are not touched.</div>
+  <label for="pbUrl">PocketBase URL</label>
+  <input id="pbUrl" value="http://127.0.0.1:8090" />
+  <label for="suEmail">Superuser Email</label>
+  <input id="suEmail" type="email" placeholder="your@email.com" />
+  <label for="suPass">Superuser Password</label>
+  <input id="suPass" type="password" placeholder="••••••••" />
+  <hr />
+  <button class="btn" id="runBtn" onclick="runSeed()">▶ Run Seed</button>
+  <button class="btn btn-clear" id="clrBtn" onclick="clearLog()" style="display:none">✕ Clear</button>
+  <div id="log"></div>
+</div>
+<script>
+// ── Seed data ────────────────────────────────────────────────
+const SETTINGS = [
+  { key: 'table_count',          value: '10' },
+  { key: 'advance_booking_days', value: '2' },
+  { key: 'available_weekdays',   value: '[1,2,3,4,5]' },
+  { key: 'school_name',          value: '"Holsenbeck Elementary School"' },
+];
+
+const ADMIN_EMAILS = [
+  'aperil.sellers@barrow.k12.ga.us',
+  'nicole.grisaffe@barrow.k12.ga.us',
+  'kendra.williams@barrow.k12.ga.us',
+  'ashley.parham@barrow.k12.ga.us',
+  'mthompson@barrow.k12.ga.us',
+  'networking@barrow.k12.ga.us',
+];
+
+const TIMESLOTS = [
+  { name:'3RD', description:'3rd Grade Lunch',    start_time:'10:00:00', end_time:'10:30:00', sort_order:0, scenario_type:'A', is_active:true },
+  { name:'4TH', description:'4th Grade Lunch',    start_time:'10:40:00', end_time:'11:10:00', sort_order:1, scenario_type:'A', is_active:true },
+  { name:'KDG', description:'Kindergarten Lunch', start_time:'11:20:00', end_time:'11:50:00', sort_order:2, scenario_type:'A', is_active:true },
+  { name:'1ST', description:'1st Grade Lunch',    start_time:'12:00:00', end_time:'12:30:00', sort_order:3, scenario_type:'A', is_active:true },
+  { name:'5TH', description:'5th Grade Lunch',    start_time:'10:15:00', end_time:'10:45:00', sort_order:0, scenario_type:'B', is_active:true },
+  { name:'2ND', description:'2nd Grade Lunch',    start_time:'11:00:00', end_time:'11:30:00', sort_order:1, scenario_type:'B', is_active:true },
+  { name:'PK',  description:'PreK Lunch',         start_time:'11:45:00', end_time:'12:15:00', sort_order:2, scenario_type:'B', is_active:true },
+];
+
+const SCHOOL_BREAKS = [
+  { name:'Thanksgiving Break', start_date:'2026-11-23', end_date:'2026-11-27' },
+  { name:'Early Dismissal',    start_date:'2026-12-18', end_date:'2026-12-18' },
+  { name:'Winter Break',       start_date:'2026-12-21', end_date:'2027-01-05' },
+  { name:'MLK Holiday',        start_date:'2027-01-18', end_date:'2027-01-18' },
+  { name:'February Break',     start_date:'2027-02-12', end_date:'2027-02-15' },
+  { name:'March Break',        start_date:'2027-03-12', end_date:'2027-03-12' },
+  { name:'Spring Break',       start_date:'2027-04-05', end_date:'2027-04-09' },
+  { name:'Early Dismissal',    start_date:'2027-05-21', end_date:'2027-05-21' },
+  { name:'Summer Break',       start_date:'2027-05-24', end_date:'2027-07-29' },
+  { name:'No school',          start_date:'2027-09-03', end_date:'2027-09-03' },
+  { name:'Labor Day',          start_date:'2027-09-06', end_date:'2027-09-06' },
+  { name:'Fall Break',         start_date:'2027-10-04', end_date:'2027-10-08' },
+  { name:'Thanksgiving Break', start_date:'2027-11-22', end_date:'2027-11-26' },
+  { name:'Early Dismissal',    start_date:'2027-12-17', end_date:'2027-12-17' },
+  { name:'Winter Break',       start_date:'2027-12-20', end_date:'2028-01-05' },
+  { name:'MLK Holiday',        start_date:'2028-01-17', end_date:'2028-01-17' },
+  { name:'Feb Break',          start_date:'2028-02-18', end_date:'2028-02-18' },
+  { name:'Feb Break',          start_date:'2028-02-21', end_date:'2028-02-21' },
+  { name:'March Break',        start_date:'2028-03-10', end_date:'2028-03-10' },
+  { name:'Spring Break',       start_date:'2028-04-03', end_date:'2028-04-07' },
+  { name:'Early Dismissal',    start_date:'2028-05-19', end_date:'2028-05-19' },
+  { name:'Summer Break',       start_date:'2028-05-22', end_date:'2028-07-28' },
+];
+
+const EMAIL_TEMPLATES = [
+  {
+    template_key: 'approved',
+    subject: 'Your Lunch Reservation at Holsenbeck Elementary is Approved!',
+    body: 'Dear {{parent_name}},\n\nYour lunch table reservation has been approved!\n\nReservation Details:\n- Date:          {{reservation_date}}\n- Time Slot:     {{timeslot_name}} ({{timeslot_start}} - {{timeslot_end}})\n- Table:         {{table_number}}\n- Guests:        {{num_guests}}\n- Student:       {{student_name}}\n- Teacher:       {{teacher_name}}\n- Guest Name(s): {{guest_names}}\n{{admin_notes_section}}\nPlease remember all guests must be on the approved visitor list.\nArrive at the main office to check in.\n\nWe look forward to seeing you!\n\nHolsenbeck Elementary School',
+  },
+  {
+    template_key: 'rejected',
+    subject: 'Update on Your Lunch Reservation Request at Holsenbeck Elementary',
+    body: 'Dear {{parent_name}},\n\nWe are unable to approve your reservation request at this time.\n\nReservation Details:\n- Date:          {{reservation_date}}\n- Time Slot:     {{timeslot_name}} ({{timeslot_start}} - {{timeslot_end}})\n- Table:         {{table_number}}\n- Guests:        {{num_guests}}\n- Student:       {{student_name}}\n- Teacher:       {{teacher_name}}\n- Guest Name(s): {{guest_names}}\n{{admin_notes_section}}\nYou are welcome to submit a new reservation request for a different date or time.\n\nHolsenbeck Elementary School',
+  },
+  {
+    template_key: 'cancelled',
+    subject: 'Your Lunch Reservation at Holsenbeck Elementary Has Been Cancelled',
+    body: 'Dear {{parent_name}},\n\nWe are writing to let you know that your lunch table reservation at Holsenbeck Elementary has been cancelled by an administrator.\n\nReservation Details:\n- Date:          {{reservation_date}}\n- Time Slot:     {{timeslot_name}} ({{timeslot_start}} - {{timeslot_end}})\n- Table:         {{table_number}}\n- Guests:        {{num_guests}}\n- Student:       {{student_name}}\n- Teacher:       {{teacher_name}}\n- Guest Name(s): {{guest_names}}\n{{admin_notes_section}}\nIf you have questions or would like to make a new reservation, please log in to the reservation system or contact the school office.\n\nThank you,\nHolsenbeck Elementary Lunch Team',
+  },
+];
+
+// ── Helpers ──────────────────────────────────────────────────
+const logEl = document.getElementById('log');
+function log(msg, cls) {
+  logEl.style.display = 'block';
+  document.getElementById('clrBtn').style.display = 'inline-block';
+  const s = document.createElement('span');
+  s.className = cls || '';
+  s.textContent = msg + '\n';
+  logEl.appendChild(s);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function clearLog() {
+  logEl.innerHTML = '';
+  logEl.style.display = 'none';
+  document.getElementById('clrBtn').style.display = 'none';
+}
+async function upsert(pb, col, filterExpr, data) {
+  let ex = null;
+  try { ex = await pb.collection(col).getFirstListItem(filterExpr); } catch(e) {}
+  if (ex) { await pb.collection(col).update(ex.id, data); return 'updated'; }
+  await pb.collection(col).create(data); return 'created';
+}
+async function deleteAll(pb, col) {
+  const all = await pb.collection(col).getFullList({ fields: 'id' });
+  for (const r of all) await pb.collection(col).delete(r.id);
+  return all.length;
+}
+
+// ── Main runner ───────────────────────────────────────────────
+async function runSeed() {
+  const pbUrl = document.getElementById('pbUrl').value.trim().replace(/\/$/, '');
+  const email = document.getElementById('suEmail').value.trim();
+  const pass  = document.getElementById('suPass').value;
+  if (!email || !pass) { alert('Enter superuser email and password.'); return; }
+
+  document.getElementById('runBtn').disabled = true;
+  logEl.innerHTML = ''; logEl.style.display = 'block';
+  document.getElementById('clrBtn').style.display = 'inline-block';
+
+  try {
+    log('Connecting to ' + pbUrl + ' ...', 'warn');
+    const pb = new PocketBase(pbUrl);
+
+    // Try both old (pb.admins) and new (_superusers collection) auth APIs
+    try {
+      await pb.admins.authWithPassword(email, pass);
+    } catch(e) {
+      await pb.collection('_superusers').authWithPassword(email, pass);
+    }
+    log('✓ Authenticated as superuser\n', 'ok');
+
+    // ── Settings ────────────────────────────────────────────
+    log('── SETTINGS ─────────────────────────────────────────', 'hd');
+    for (const s of SETTINGS) {
+      const act = await upsert(pb, 'settings', pb.filter('key={:k}', {k:s.key}), {key:s.key, value:s.value});
+      log('  ' + (act==='created'?'✓ created':'↺ updated') + '  ' + s.key + ' = ' + s.value, 'ok');
+    }
+
+    // ── Admin emails ────────────────────────────────────────
+    log('\n── ADMIN EMAILS ─────────────────────────────────────', 'hd');
+    for (const e of ADMIN_EMAILS) {
+      const act = await upsert(pb, 'admin_emails', pb.filter('email={:e}', {e}), {email:e});
+      log('  ' + (act==='created'?'✓ created':'↺ exists') + '  ' + e, 'ok');
+    }
+
+    // ── Timeslots (delete-all then re-insert) ───────────────
+    log('\n── TIMESLOTS ────────────────────────────────────────', 'hd');
+    const tsDel = await deleteAll(pb, 'timeslots');
+    log('  Deleted ' + tsDel + ' existing record(s)', 'warn');
+    for (const ts of TIMESLOTS) {
+      await pb.collection('timeslots').create(ts);
+      log('  ✓ created  [' + ts.scenario_type + '] ' + ts.name + '  ' + ts.start_time + ' – ' + ts.end_time, 'ok');
+    }
+
+    // ── School breaks (delete-all then re-insert) ───────────
+    log('\n── SCHOOL BREAKS ────────────────────────────────────', 'hd');
+    const brDel = await deleteAll(pb, 'school_breaks');
+    log('  Deleted ' + brDel + ' existing record(s)', 'warn');
+    for (const b of SCHOOL_BREAKS) {
+      await pb.collection('school_breaks').create(b);
+      log('  ✓ created  ' + b.name + ' (' + b.start_date + ' \u2192 ' + b.end_date + ')', 'ok');
+    }
+
+    // ── Email templates ─────────────────────────────────────
+    log('\n── EMAIL TEMPLATES ──────────────────────────────────', 'hd');
+    for (const t of EMAIL_TEMPLATES) {
+      const act = await upsert(pb, 'email_templates', pb.filter('template_key={:k}', {k:t.template_key}), t);
+      log('  ' + (act==='created'?'✓ created':'↺ updated') + '  ' + t.template_key, 'ok');
+    }
+
+    // ── Done ────────────────────────────────────────────────
+    log('\n\u2705  Seed complete!\n', 'ok');
+    log('Next steps:', 'warn');
+    log('  1. Register in the app with one of the admin_emails above', 'warn');
+    log('     \u2192 it will automatically receive role=admin on sign-up.', 'warn');
+    log('  2. Or: register any email, then in the PocketBase dashboard', 'warn');
+    log('     open Collections \u2192 users \u2192 find your record \u2192 set role=admin.', 'warn');
+    log('  3. Open http://localhost:8080 and log in!', 'warn');
+
+  } catch(err) {
+    log('\n\u274C Error: ' + (err.message || String(err)), 'err');
+    if (err.response) log('   ' + JSON.stringify(err.response.data || err.response), 'err');
+    log('\nCommon causes:', 'warn');
+    log('  \u2022 Wrong superuser email / password', 'warn');
+    log('  \u2022 PocketBase not running at the URL above', 'warn');
+    log('  \u2022 Collections not yet imported (import pb_schema.json first)', 'warn');
+  } finally {
+    document.getElementById('runBtn').disabled = false;
+  }
+}
+</script>
+</body>
+</html>
